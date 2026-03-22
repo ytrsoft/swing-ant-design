@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Swing Ant Design
+Comment=Ant Design UI Components for Java Swing
+Exec=java -jar swing-ant-design.jar
+Icon=app-icon-128
+Terminal=false
+Categories=Development;Java;

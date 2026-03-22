@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.antdesign</groupId>
+    <artifactId>swing-ant-design</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>Swing Ant Design</name>
+    <description>Ant Design UI components for Java Swing</description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+
+        <!-- 依赖版本管理 -->
+        <lombok.version>1.18.30</lombok.version>
+        <slf4j.version>2.0.16</slf4j.version>
+        <logback.version>1.5.13</logback.version>
+        <flatlaf.version>3.4</flatlaf.version>
+        <svgSalamander.version>1.1.4</svgSalamander.version>
+        <gson.version>2.10.1</gson.version>
+        <miglayout.version>5.3</miglayout.version>
+        <jfreechart.version>1.5.4</jfreechart.version>
+        <commons-lang3.version>3.18.0</commons-lang3.version>
+        <junit.version>4.13.2</junit.version>
+        <assertj.version>3.27.7</assertj.version>
+    </properties>
+
+    <dependencies>
+        <!-- ==================== 核心 ==================== -->
+
+        <!-- Lombok - 减少样板代码 (@Data, @Builder, @Getter, @Setter 等) -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- ==================== 日志 ==================== -->
+
+        <!-- SLF4J API -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+
+        <!-- Logback 日志实现 -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${logback.version}</version>
+        </dependency>
+
+        <!-- ==================== UI / Swing 增强 ==================== -->
+
+        <!-- FlatLaf - 现代化 Swing 外观主题 (Ant Design 风格基础) -->
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>${flatlaf.version}</version>
+        </dependency>
+
+        <!-- FlatLaf Extras - 额外 UI 工具 (SVG icon, 动画等) -->
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf-extras</artifactId>
+            <version>${flatlaf.version}</version>
+        </dependency>
+
+        <!-- MigLayout - 强大灵活的 Swing 布局管理器 -->
+        <dependency>
+            <groupId>com.miglayout</groupId>
+            <artifactId>miglayout-swing</artifactId>
+            <version>${miglayout.version}</version>
+        </dependency>
+
+        <!-- SVG Salamander - SVG 图标渲染 -->
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>svgSalamander</artifactId>
+            <version>${svgSalamander.version}</version>
+        </dependency>
+
+        <!-- ==================== 图表 ==================== -->
+
+        <!-- JFreeChart - 折线图/柱状图/饼图 -->
+        <dependency>
+            <groupId>org.jfree</groupId>
+            <artifactId>jfreechart</artifactId>
+            <version>${jfreechart.version}</version>
+        </dependency>
+
+        <!-- ==================== 工具库 ==================== -->
+
+        <!-- Gson - JSON 解析 (主题配置文件) -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>${gson.version}</version>
+        </dependency>
+
+        <!-- Apache Commons Lang3 - 字符串/对象工具 -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${commons-lang3.version}</version>
+        </dependency>
+
+        <!-- ==================== 测试 ==================== -->
+
+        <!-- JUnit 4 -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- AssertJ - 流式断言 -->
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>${assertj.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- 编译插件 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>9</source>
+                    <target>9</target>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+            <!-- 源码打包 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Jar 打包 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.3.0</version>
+            </plugin>
+
+            <!-- 单元测试 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.3</version>
+            </plugin>
+
+            <!-- Fat Jar - 打包所有依赖 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.antdesign.swing.AntDesign</mainClass>
+                                </transformer>
+                            </transformers>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!-- ==================== 跨平台打包 Profiles ==================== -->
+    <profiles>
+
+        <!-- Windows: 生成 .exe (launch4j) -->
+        <profile>
+            <id>windows</id>
+            <activation>
+                <os><family>windows</family></os>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.akathist.maven.plugins.launch4j</groupId>
+                        <artifactId>launch4j-maven-plugin</artifactId>
+                        <version>2.5.0</version>
+                        <executions>
+                            <execution>
+                                <id>wrap-exe</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>launch4j</goal>
+                                </goals>
+                                <configuration>
+                                    <headerType>gui</headerType>
+                                    <jar>${project.build.directory}/${project.artifactId}-${project.version}.jar</jar>
+                                    <outfile>${project.build.directory}/${project.artifactId}.exe</outfile>
+                                    <icon>src/main/resources/com/antdesign/swing/icons/app/app-icon.ico</icon>
+                                    <classPath>
+                                        <mainClass>com.antdesign.swing.AntDesign</mainClass>
+                                    </classPath>
+                                    <jre>
+                                        <path>%JAVA_HOME%</path>
+                                        <minVersion>1.8.0</minVersion>
+                                    </jre>
+                                    <versionInfo>
+                                        <fileVersion>1.0.0.0</fileVersion>
+                                        <txtFileVersion>${project.version}</txtFileVersion>
+                                        <fileDescription>${project.description}</fileDescription>
+                                        <copyright>Ant Design for Swing</copyright>
+                                        <productVersion>1.0.0.0</productVersion>
+                                        <txtProductVersion>${project.version}</txtProductVersion>
+                                        <productName>${project.name}</productName>
+                                        <internalName>${project.artifactId}</internalName>
+                                        <originalFilename>${project.artifactId}.exe</originalFilename>
+                                    </versionInfo>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- macOS: 生成 .app Bundle -->
+        <profile>
+            <id>macos</id>
+            <activation>
+                <os><family>mac</family></os>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>de.perdian.maven.plugins</groupId>
+                        <artifactId>macosappbundler-maven-plugin</artifactId>
+                        <version>1.18.0</version>
+                        <configuration>
+                            <plist>
+                                <CFBundleDisplayName>${project.name}</CFBundleDisplayName>
+                                <CFBundleName>${project.artifactId}</CFBundleName>
+                                <CFBundleIdentifier>com.antdesign.swing</CFBundleIdentifier>
+                                <CFBundleShortVersionString>${project.version}</CFBundleShortVersionString>
+                                <JVMMainClassName>com.antdesign.swing.AntDesign</JVMMainClassName>
+                                <JVMVersion>1.8+</JVMVersion>
+                                <CFBundleIconFile>app-icon.icns</CFBundleIconFile>
+                            </plist>
+                            <iconFile>src/main/resources/com/antdesign/swing/icons/app/app-icon-512.png</iconFile>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>bundle</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Linux: 生成 tar.gz 分发包 -->
+        <profile>
+            <id>linux</id>
+            <activation>
+                <os><family>unix</family><name>Linux</name></os>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <version>3.6.0</version>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/assembly/linux-dist.xml</descriptor>
+                            </descriptors>
+                            <finalName>${project.artifactId}-${project.version}-linux</finalName>
+                            <appendAssemblyId>false</appendAssemblyId>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>linux-dist</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- 通用跨平台 zip 分发包 -->
+        <profile>
+            <id>dist</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <version>3.6.0</version>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/assembly/dist.xml</descriptor>
+                            </descriptors>
+                            <finalName>${project.artifactId}-${project.version}</finalName>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>create-dist</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>
