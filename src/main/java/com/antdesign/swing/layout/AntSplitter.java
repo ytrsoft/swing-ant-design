@@ -1,6 +1,5 @@
 package com.antdesign.swing.layout;
 
-import com.antdesign.swing.base.AbstractAntPanel;
 import com.antdesign.swing.general.AntPanel;
 import com.antdesign.swing.util.AntColor;
 
