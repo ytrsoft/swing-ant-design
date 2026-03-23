@@ -184,7 +184,7 @@ public class AntModal {
 
   private void buildDialog() {
     JPanel root = new ModalRootPanel();
-    root.setLayout(new BorderLayout());
+    // ModalRootPanel 使用 GridBagLayout 以实现卡片居中，不可覆写
 
     JPanel card = new ModalCardPanel();
     card.setLayout(new BorderLayout());
@@ -259,9 +259,9 @@ public class AntModal {
 
     card.add(footer, BorderLayout.SOUTH);
 
-    // 将卡片居中放在遮罩上
+    // 将卡片居中放在遮罩上（GridBagLayout 自动居中）
     card.setPreferredSize(new Dimension(DEFAULT_WIDTH, card.getPreferredSize().height));
-    root.add(card, BorderLayout.CENTER);
+    root.add(card, new java.awt.GridBagConstraints());
 
     // 点击遮罩关闭
     root.addMouseListener(new MouseAdapter() {
@@ -325,11 +325,8 @@ public class AntModal {
         GraphicsUtils.setupAntialiasing(g2);
         ColorToken ct = AntThemeManager.getInstance().getColorToken();
 
-        // 阴影
-        for (int i = 8; i > 0; i--) {
-          g2.setColor(new Color(0, 0, 0, 3 * (9 - i)));
-          g2.fillRoundRect(i, i + 2, getWidth() - i * 2, getHeight() - i * 2, 12, 12);
-        }
+        GraphicsUtils.drawShadow(g2, 0, 0, getWidth(), getHeight(),
+            12, new Color(0, 0, 0, 40), 2, 8);
 
         g2.setColor(ct.getBgElevated());
         g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);

@@ -133,10 +133,12 @@ public class AntTransfer extends AbstractAntComponent {
     FontToken ft = fontToken();
     SizeToken st = sizeToken();
 
-    // 源列表
-    JPanel sourcePanel = buildListPanel(sourceTitle, sourceModel, ct, ft, st);
-    sourceList = (JList<String>) ((JScrollPane) ((BorderLayout) sourcePanel.getLayout())
-        .getLayoutComponent(BorderLayout.CENTER)).getViewport().getView();
+    // 创建 JList 实例
+    sourceList = new JList<>(sourceModel);
+    targetList = new JList<>(targetModel);
+
+    // 源列表面板
+    JPanel sourcePanel = buildListPanel(sourceTitle, sourceList, ct, ft, st);
 
     // 按钮
     JPanel btnPanel = new JPanel();
@@ -172,10 +174,8 @@ public class AntTransfer extends AbstractAntComponent {
     btnPanel.add(toLeft);
     btnPanel.add(javax.swing.Box.createVerticalGlue());
 
-    // 目标列表
-    JPanel targetPanel = buildListPanel(targetTitle, targetModel, ct, ft, st);
-    targetList = (JList<String>) ((JScrollPane) ((BorderLayout) targetPanel.getLayout())
-        .getLayoutComponent(BorderLayout.CENTER)).getViewport().getView();
+    // 目标列表面板
+    JPanel targetPanel = buildListPanel(targetTitle, targetList, ct, ft, st);
 
     JPanel main = new JPanel(new BorderLayout());
     main.setOpaque(false);
@@ -188,7 +188,7 @@ public class AntTransfer extends AbstractAntComponent {
     repaint();
   }
 
-  private JPanel buildListPanel(String title, DefaultListModel<String> model,
+  private JPanel buildListPanel(String title, JList<String> list,
       ColorToken ct, FontToken ft, SizeToken st) {
     JPanel panel = new JPanel(new BorderLayout());
     panel.setOpaque(false);
@@ -204,7 +204,6 @@ public class AntTransfer extends AbstractAntComponent {
             st.getPaddingXs(), st.getPaddingSm())));
     panel.add(titleLabel, BorderLayout.NORTH);
 
-    JList<String> list = new JList<>(model);
     list.setFont(ft.createFont(ft.getFontSize(), Font.PLAIN));
     list.setForeground(ct.getTextColor());
     list.setBackground(ct.getBgContainer());

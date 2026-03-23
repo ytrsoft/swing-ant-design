@@ -1,6 +1,8 @@
 package com.antdesign.swing.display;
 
 import com.antdesign.swing.base.AbstractAntComponent;
+import com.antdesign.swing.event.AntChangeEvent;
+import com.antdesign.swing.event.AntChangeListener;
 import com.antdesign.swing.theme.token.ColorToken;
 import com.antdesign.swing.theme.token.FontToken;
 import com.antdesign.swing.theme.token.SizeToken;
@@ -49,6 +51,7 @@ public class AntCollapse extends AbstractAntComponent {
   @Getter private boolean ghost;
   private final List<Panel> panels = new ArrayList<>();
   private final Set<String> activeKeys = new HashSet<>();
+  private final List<AntChangeListener<Set<String>>> changeListeners = new ArrayList<>();
 
   /** 创建折叠面板。 */
   public AntCollapse() {
@@ -87,22 +90,46 @@ public class AntCollapse extends AbstractAntComponent {
 
   /** 展开指定面板。 */
   public void expand(String key) {
+    Set<String> oldKeys = getActiveKeys();
     if (accordion) {
       activeKeys.clear();
     }
     activeKeys.add(key);
     rebuildUi();
+    fireChange(oldKeys);
   }
 
   /** 折叠指定面板。 */
   public void collapse(String key) {
+    Set<String> oldKeys = getActiveKeys();
     activeKeys.remove(key);
     rebuildUi();
+    fireChange(oldKeys);
   }
 
   /** 获取当前展开的面板 key 列表。 */
   public Set<String> getActiveKeys() {
     return new HashSet<>(activeKeys);
+  }
+
+  /** 添加展开/折叠变更监听器。 */
+  public void addChangeListener(AntChangeListener<Set<String>> listener) {
+    if (listener != null) {
+      changeListeners.add(listener);
+    }
+  }
+
+  /** 移除监听器。 */
+  public void removeChangeListener(AntChangeListener<Set<String>> listener) {
+    changeListeners.remove(listener);
+  }
+
+  private void fireChange(Set<String> oldKeys) {
+    Set<String> newKeys = getActiveKeys();
+    AntChangeEvent<Set<String>> evt = new AntChangeEvent<>(this, oldKeys, newKeys);
+    for (AntChangeListener<Set<String>> l : changeListeners) {
+      l.valueChanged(evt);
+    }
   }
 
   // =========================================================================

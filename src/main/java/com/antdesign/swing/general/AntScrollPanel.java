@@ -332,7 +332,6 @@ public class AntScrollPanel extends AbstractAntPanel {
         @Override
         protected void installListeners() {
             super.installListeners();
-            thumbRect.addPropertyChangeListener(e -> scrollbar.repaint());
             scrollbar.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseEntered(MouseEvent e) {

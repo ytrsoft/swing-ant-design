@@ -14,6 +14,10 @@ import lombok.Getter;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
 import java.awt.*;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -48,6 +52,7 @@ public class AntInput extends AbstractAntComponent {
   @Getter private boolean allowClear;
 
   private JTextField textField;
+  private JLabel countLabel;
   private final List<AntChangeListener<String>> changeListeners = new CopyOnWriteArrayList<>();
 
   /** 创建默认输入框。 */
@@ -131,6 +136,7 @@ public class AntInput extends AbstractAntComponent {
 
   public void setMaxLength(int maxLength) {
     this.maxLength = maxLength;
+    installMaxLengthFilter();
   }
 
   public void setStatus(Status status) {
@@ -154,6 +160,7 @@ public class AntInput extends AbstractAntComponent {
 
   public void setAllowClear(boolean allowClear) {
     this.allowClear = allowClear;
+    rebuildLayout();
   }
 
   public void addChangeListener(AntChangeListener<String> listener) {
@@ -202,6 +209,9 @@ public class AntInput extends AbstractAntComponent {
     textField = password ? new JPasswordField() : new JTextField();
     textField.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 4));
 
+    // 使用 DocumentFilter 安全地限制最大长度，避免 setText 递归
+    installMaxLengthFilter();
+
     textField.getDocument().addDocumentListener(new DocumentListener() {
       private String prev = "";
 
@@ -216,10 +226,7 @@ public class AntInput extends AbstractAntComponent {
 
       private void fireChange() {
         String newVal = textField.getText();
-        if (maxLength > 0 && newVal.length() > maxLength) {
-          textField.setText(newVal.substring(0, maxLength));
-          return;
-        }
+        updateCountLabel();
         AntChangeEvent<String> evt = new AntChangeEvent<>(AntInput.this, prev, newVal);
         prev = newVal;
         for (AntChangeListener<String> l : changeListeners) {
@@ -230,6 +237,45 @@ public class AntInput extends AbstractAntComponent {
 
     rebuildLayout();
     applyTheme();
+  }
+
+  /** 通过 DocumentFilter 限制最大输入长度。 */
+  private void installMaxLengthFilter() {
+    if (textField.getDocument() instanceof AbstractDocument) {
+      ((AbstractDocument) textField.getDocument()).setDocumentFilter(new DocumentFilter() {
+        @Override
+        public void insertString(FilterBypass fb, int offset, String string,
+            AttributeSet attr) throws BadLocationException {
+          if (maxLength > 0) {
+            int currentLen = fb.getDocument().getLength();
+            int available = maxLength - currentLen;
+            if (available <= 0) {
+              return;
+            }
+            if (string.length() > available) {
+              string = string.substring(0, available);
+            }
+          }
+          super.insertString(fb, offset, string, attr);
+        }
+
+        @Override
+        public void replace(FilterBypass fb, int offset, int length, String text,
+            AttributeSet attrs) throws BadLocationException {
+          if (maxLength > 0 && text != null) {
+            int currentLen = fb.getDocument().getLength();
+            int available = maxLength - (currentLen - length);
+            if (available <= 0) {
+              return;
+            }
+            if (text.length() > available) {
+              text = text.substring(0, available);
+            }
+          }
+          super.replace(fb, offset, length, text, attrs);
+        }
+      });
+    }
   }
 
   private void rebuildLayout() {
@@ -256,6 +302,7 @@ public class AntInput extends AbstractAntComponent {
 
     add(textField, BorderLayout.CENTER);
 
+    // --- 右侧区域：addonAfter > (suffix + allowClear + showCount) ---
     if (addonAfter != null) {
       JLabel addon = new JLabel(addonAfter);
       addon.setFont(ft.createFont(ft.getFontSize(), Font.PLAIN));
@@ -266,28 +313,91 @@ public class AntInput extends AbstractAntComponent {
       addon.setOpaque(true);
       addon.setBackground(ct.getBgLayout());
       add(addon, BorderLayout.EAST);
-    } else if (suffix != null) {
-      JLabel sufLabel = new JLabel(suffix);
-      sufLabel.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, st.getPaddingXs()));
-      add(sufLabel, BorderLayout.EAST);
+    } else {
+      // 组合右侧面板：suffix / allowClear / showCount
+      JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
+      rightPanel.setOpaque(false);
+      boolean hasRight = false;
+
+      if (suffix != null) {
+        JLabel sufLabel = new JLabel(suffix);
+        sufLabel.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 0));
+        rightPanel.add(sufLabel);
+        hasRight = true;
+      }
+
+      if (allowClear) {
+        JLabel clearLabel = new JLabel("✕");
+        clearLabel.setFont(ft.createFont(ft.getFontSizeSm(), Font.PLAIN));
+        clearLabel.setForeground(ct.getTextTertiaryColor());
+        clearLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        clearLabel.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
+        clearLabel.setToolTipText("Clear");
+        clearLabel.addMouseListener(new java.awt.event.MouseAdapter() {
+          @Override
+          public void mouseClicked(java.awt.event.MouseEvent e) {
+            if (isEnabled()) {
+              textField.setText("");
+              textField.requestFocusInWindow();
+            }
+          }
+
+          @Override
+          public void mouseEntered(java.awt.event.MouseEvent e) {
+            clearLabel.setForeground(ct.getTextSecondaryColor());
+          }
+
+          @Override
+          public void mouseExited(java.awt.event.MouseEvent e) {
+            clearLabel.setForeground(ct.getTextTertiaryColor());
+          }
+        });
+        rightPanel.add(clearLabel);
+        hasRight = true;
+      }
+
+      if (showCount) {
+        countLabel = new JLabel(buildCountText());
+        countLabel.setFont(ft.createFont(ft.getFontSizeSm(), Font.PLAIN));
+        countLabel.setForeground(ct.getTextTertiaryColor());
+        countLabel.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 4));
+        rightPanel.add(countLabel);
+        hasRight = true;
+      } else {
+        countLabel = null;
+      }
+
+      if (hasRight) {
+        rightPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, st.getPaddingXs()));
+        add(rightPanel, BorderLayout.EAST);
+      }
     }
 
     revalidate();
     repaint();
   }
 
+  /** 构建字数统计文本。 */
+  private String buildCountText() {
+    int len = textField != null ? textField.getText().length() : 0;
+    if (maxLength > 0) {
+      return len + " / " + maxLength;
+    }
+    return String.valueOf(len);
+  }
+
+  /** 更新字数统计显示。 */
+  private void updateCountLabel() {
+    if (countLabel != null && showCount) {
+      countLabel.setText(buildCountText());
+    }
+  }
+
   private void applyTheme() {
     ColorToken ct = colorToken();
     FontToken ft = fontToken();
-    SizeToken st = sizeToken();
 
-    int fontSize;
-    switch (size) {
-      case LARGE:  fontSize = ft.getFontSizeLg(); break;
-      case SMALL:  fontSize = ft.getFontSizeSm(); break;
-      default:     fontSize = ft.getFontSize(); break;
-    }
-    textField.setFont(ft.createFont(fontSize, Font.PLAIN));
+    textField.setFont(ft.createFont(size, Font.PLAIN));
     textField.setForeground(ct.getTextColor());
     textField.setCaretColor(ct.getTextColor());
 

@@ -5,10 +5,12 @@ import com.antdesign.swing.display.AntCalendar;
 import com.antdesign.swing.event.AntChangeEvent;
 import com.antdesign.swing.event.AntChangeListener;
 import com.antdesign.swing.model.ComponentSize;
+import com.antdesign.swing.model.Placement;
 import com.antdesign.swing.model.Variant;
 import com.antdesign.swing.theme.token.ColorToken;
 import com.antdesign.swing.theme.token.FontToken;
 import com.antdesign.swing.theme.token.SizeToken;
+import com.antdesign.swing.util.PopupHelper;
 import lombok.Getter;
 
 import javax.swing.*;
@@ -16,6 +18,7 @@ import java.awt.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -61,7 +64,7 @@ public class AntDatePicker extends AbstractAntComponent {
     LocalDate old = this.value;
     this.value = value;
     textField.setText(value != null ? value.format(FORMATTER) : "");
-    if (old != value) {
+    if (!Objects.equals(old, value)) {
       AntChangeEvent<LocalDate> evt = new AntChangeEvent<>(this, old, value);
       for (AntChangeListener<LocalDate> l : changeListeners) {
         l.valueChanged(evt);
@@ -127,8 +130,11 @@ public class AntDatePicker extends AbstractAntComponent {
 
   private void toggleCalendar() {
     if (calendarPopup != null) {
-      calendarPopup.hide();
+      PopupHelper.hidePopup(calendarPopup);
       calendarPopup = null;
+      return;
+    }
+    if (!textField.isShowing()) {
       return;
     }
     AntCalendar calendar = new AntCalendar();
@@ -140,23 +146,18 @@ public class AntDatePicker extends AbstractAntComponent {
     calendar.addChangeListener(e -> {
       setValue(e.getNewValue());
       if (calendarPopup != null) {
-        calendarPopup.hide();
+        PopupHelper.hidePopup(calendarPopup);
         calendarPopup = null;
       }
     });
 
-    java.awt.Point p = textField.getLocationOnScreen();
-    calendarPopup = PopupFactory.getSharedInstance().getPopup(
-        this, calendar, p.x, p.y + getHeight());
-    calendarPopup.show();
+    calendarPopup = PopupHelper.showPopup(textField, calendar, Placement.BOTTOM, 4);
   }
 
   private void applyTheme() {
     ColorToken ct = colorToken();
     FontToken ft = fontToken();
-    int fontSize = (size == ComponentSize.LARGE) ? ft.getFontSizeLg()
-        : (size == ComponentSize.SMALL) ? ft.getFontSizeSm() : ft.getFontSize();
-    textField.setFont(ft.createFont(fontSize, Font.PLAIN));
+    textField.setFont(ft.createFont(size, Font.PLAIN));
     textField.setForeground(ct.getTextColor());
     textField.setBackground(ct.getBgContainer());
 

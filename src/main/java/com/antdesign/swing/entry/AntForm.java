@@ -39,6 +39,61 @@ public class AntForm extends AbstractAntComponent {
   private ComponentSize size;
 
   private final Map<String, FormField> fields = new LinkedHashMap<>();
+  private java.util.function.Consumer<Map<String, Object>> onFinish;
+  private java.util.function.Consumer<Map<String, String>> onFinishFailed;
+
+  // =========================================================================
+  // Rule 校验规则
+  // =========================================================================
+
+  /** 表单校验规则。 */
+  public static class Rule {
+    private boolean required;
+    private String message;
+    private Integer min;
+    private Integer max;
+    private String pattern;
+    private java.util.function.Function<Object, String> validator;
+
+    /** 必填规则。 */
+    public static Rule required(String message) {
+      Rule r = new Rule();
+      r.required = true;
+      r.message = message;
+      return r;
+    }
+
+    /** 最小长度规则。 */
+    public static Rule min(int min, String message) {
+      Rule r = new Rule();
+      r.min = min;
+      r.message = message;
+      return r;
+    }
+
+    /** 最大长度规则。 */
+    public static Rule max(int max, String message) {
+      Rule r = new Rule();
+      r.max = max;
+      r.message = message;
+      return r;
+    }
+
+    /** 正则规则。 */
+    public static Rule pattern(String pattern, String message) {
+      Rule r = new Rule();
+      r.pattern = pattern;
+      r.message = message;
+      return r;
+    }
+
+    /** 自定义校验器。返回 null 表示通过，否则返回错误信息。 */
+    public static Rule custom(java.util.function.Function<Object, String> validator) {
+      Rule r = new Rule();
+      r.validator = validator;
+      return r;
+    }
+  }
 
   /** 表单字段。 */
   @Getter
@@ -48,6 +103,8 @@ public class AntForm extends AbstractAntComponent {
     private final Component component;
     private boolean required;
     private String errorMessage;
+    private Object initialValue;
+    private final List<Rule> rules = new ArrayList<>();
 
     public FormField(String name, String label, Component component) {
       this.name = name;
@@ -121,6 +178,230 @@ public class AntForm extends AbstractAntComponent {
   public Component getFieldComponent(String name) {
     FormField field = fields.get(name);
     return (field != null) ? field.component : null;
+  }
+
+  /**
+   * 添加带校验规则的字段。
+   *
+   * @param name      字段名称
+   * @param label     标签文本
+   * @param component 输入组件
+   * @param rules     校验规则列表
+   */
+  public void addField(String name, String label, Component component, Rule... rules) {
+    FormField field = new FormField(name, label, component);
+    if (rules != null) {
+      for (Rule r : rules) {
+        field.rules.add(r);
+        if (r.required) {
+          field.required = true;
+        }
+      }
+    }
+    field.initialValue = extractValue(component);
+    fields.put(name, field);
+    rebuildUi();
+  }
+
+  // =========================================================================
+  // 数据收集
+  // =========================================================================
+
+  /**
+   * 获取所有字段的值。
+   *
+   * @return 字段名 → 值 的映射
+   */
+  public Map<String, Object> getFieldsValue() {
+    Map<String, Object> values = new LinkedHashMap<>();
+    for (Map.Entry<String, FormField> entry : fields.entrySet()) {
+      values.put(entry.getKey(), extractValue(entry.getValue().component));
+    }
+    return values;
+  }
+
+  /**
+   * 获取指定字段的值。
+   *
+   * @param name 字段名
+   * @return 字段值
+   */
+  public Object getFieldValue(String name) {
+    FormField field = fields.get(name);
+    return (field != null) ? extractValue(field.component) : null;
+  }
+
+  /**
+   * 批量设置字段值。
+   *
+   * @param values 字段名 → 值 的映射
+   */
+  public void setFieldsValue(Map<String, Object> values) {
+    if (values == null) {
+      return;
+    }
+    for (Map.Entry<String, Object> entry : values.entrySet()) {
+      FormField field = fields.get(entry.getKey());
+      if (field != null) {
+        injectValue(field.component, entry.getValue());
+      }
+    }
+  }
+
+  /**
+   * 重置所有字段为初始值，并清除错误信息。
+   */
+  public void resetFields() {
+    for (FormField field : fields.values()) {
+      field.errorMessage = null;
+      injectValue(field.component, field.initialValue);
+    }
+    rebuildUi();
+  }
+
+  // =========================================================================
+  // 校验
+  // =========================================================================
+
+  /**
+   * 校验所有字段。
+   *
+   * @return 校验错误映射（字段名 → 错误信息），为空表示全部通过
+   */
+  public Map<String, String> validateFields() {
+    Map<String, String> errors = new LinkedHashMap<>();
+
+    for (FormField field : fields.values()) {
+      String error = validateField(field);
+      if (error != null) {
+        errors.put(field.name, error);
+        field.errorMessage = error;
+      } else {
+        field.errorMessage = null;
+      }
+    }
+
+    rebuildUi();
+    return errors;
+  }
+
+  /**
+   * 提交表单：先校验，通过则调用 onFinish，失败则调用 onFinishFailed。
+   *
+   * @return 是否校验通过
+   */
+  public boolean submit() {
+    Map<String, String> errors = validateFields();
+    if (errors.isEmpty()) {
+      if (onFinish != null) {
+        onFinish.accept(getFieldsValue());
+      }
+      return true;
+    } else {
+      if (onFinishFailed != null) {
+        onFinishFailed.accept(errors);
+      }
+      return false;
+    }
+  }
+
+  /** 设置提交成功回调。 */
+  public void setOnFinish(java.util.function.Consumer<Map<String, Object>> onFinish) {
+    this.onFinish = onFinish;
+  }
+
+  /** 设置校验失败回调。 */
+  public void setOnFinishFailed(
+      java.util.function.Consumer<Map<String, String>> onFinishFailed) {
+    this.onFinishFailed = onFinishFailed;
+  }
+
+  // =========================================================================
+  // 值提取 / 注入 辅助
+  // =========================================================================
+
+  /** 从组件中提取值。支持常见的 Ant 组件和标准 Swing 组件。 */
+  @SuppressWarnings("rawtypes")
+  private static Object extractValue(Component comp) {
+    if (comp instanceof AntInput) {
+      return ((AntInput) comp).getValue();
+    } else if (comp instanceof AntSelect) {
+      return ((AntSelect) comp).getValue();
+    } else if (comp instanceof AntCheckbox) {
+      return ((AntCheckbox) comp).isChecked();
+    } else if (comp instanceof AntSwitch) {
+      return ((AntSwitch) comp).isChecked();
+    } else if (comp instanceof AntDatePicker) {
+      return ((AntDatePicker) comp).getValue();
+    } else if (comp instanceof AntInputNumber) {
+      return ((AntInputNumber) comp).getValue();
+    } else if (comp instanceof AntRate) {
+      return ((AntRate) comp).getValue();
+    } else if (comp instanceof javax.swing.JTextField) {
+      return ((javax.swing.JTextField) comp).getText();
+    } else if (comp instanceof javax.swing.JCheckBox) {
+      return ((javax.swing.JCheckBox) comp).isSelected();
+    }
+    return null;
+  }
+
+  /** 向组件注入值。 */
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static void injectValue(Component comp, Object value) {
+    if (comp instanceof AntInput) {
+      ((AntInput) comp).setValue(value != null ? value.toString() : "");
+    } else if (comp instanceof AntSelect && value != null) {
+      ((AntSelect) comp).setValue(value);
+    } else if (comp instanceof AntCheckbox) {
+      ((AntCheckbox) comp).setChecked(Boolean.TRUE.equals(value));
+    } else if (comp instanceof AntSwitch) {
+      ((AntSwitch) comp).setChecked(Boolean.TRUE.equals(value));
+    } else if (comp instanceof AntDatePicker && value instanceof java.time.LocalDate) {
+      ((AntDatePicker) comp).setValue((java.time.LocalDate) value);
+    } else if (comp instanceof javax.swing.JTextField) {
+      ((javax.swing.JTextField) comp).setText(value != null ? value.toString() : "");
+    }
+  }
+
+  /** 校验单个字段。返回第一个错误信息，或 null 表示通过。 */
+  private String validateField(FormField field) {
+    Object value = extractValue(field.component);
+    String strVal = (value != null) ? value.toString() : "";
+
+    // 隐式 required 校验
+    if (field.required && field.rules.isEmpty()) {
+      if (value == null || strVal.trim().isEmpty()) {
+        return field.label + " is required";
+      }
+    }
+
+    // 显式规则校验
+    for (Rule rule : field.rules) {
+      if (rule.required) {
+        if (value == null || strVal.trim().isEmpty()) {
+          return (rule.message != null) ? rule.message : field.label + " is required";
+        }
+      }
+      if (rule.min != null && strVal.length() < rule.min) {
+        return (rule.message != null) ? rule.message
+            : field.label + " must be at least " + rule.min + " characters";
+      }
+      if (rule.max != null && strVal.length() > rule.max) {
+        return (rule.message != null) ? rule.message
+            : field.label + " must be at most " + rule.max + " characters";
+      }
+      if (rule.pattern != null && !strVal.matches(rule.pattern)) {
+        return (rule.message != null) ? rule.message
+            : field.label + " format is invalid";
+      }
+      if (rule.validator != null) {
+        String err = rule.validator.apply(value);
+        if (err != null) {
+          return err;
+        }
+      }
+    }
+    return null;
   }
 
   // =========================================================================

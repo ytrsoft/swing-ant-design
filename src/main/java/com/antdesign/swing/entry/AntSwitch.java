@@ -126,7 +126,25 @@ public class AntSwitch extends AbstractAntComponent {
       return super.getPreferredSize();
     }
     boolean small = (size == ComponentSize.SMALL);
-    return new Dimension(small ? 28 : 44, small ? 16 : 22);
+    int baseW = small ? 28 : 44;
+    int baseH = small ? 16 : 22;
+
+    // 如果有 checkedText / uncheckedText，需要加宽轨道以容纳文本
+    String longerText = longerOf(checkedText, uncheckedText);
+    if (longerText != null && !longerText.isEmpty()) {
+      FontMetrics fm = getFontMetrics(
+          fontToken().createFont(small ? 10 : 12, java.awt.Font.PLAIN));
+      int textW = fm.stringWidth(longerText);
+      baseW = Math.max(baseW, textW + (baseH - 4) + 10); // 手柄宽 + padding
+    }
+    return new Dimension(baseW, baseH);
+  }
+
+  /** 返回两个字符串中较长的一个。 */
+  private static String longerOf(String a, String b) {
+    int la = (a != null) ? a.length() : 0;
+    int lb = (b != null) ? b.length() : 0;
+    return la >= lb ? a : b;
   }
 
   // =========================================================================
@@ -160,6 +178,26 @@ public class AntSwitch extends AbstractAntComponent {
     int handleX = checked ? (w - handleSize - 2) : 2;
     g2.setColor(Color.WHITE);
     g2.fillOval(handleX, 2, handleSize, handleSize);
+
+    // checkedText / uncheckedText — 显示在手柄对面
+    String displayText = checked ? checkedText : uncheckedText;
+    if (displayText != null && !displayText.isEmpty()) {
+      boolean small = (size == ComponentSize.SMALL);
+      g2.setFont(fontToken().createFont(small ? 10 : 12, java.awt.Font.PLAIN));
+      g2.setColor(Color.WHITE);
+      FontMetrics fm = g2.getFontMetrics();
+      int textW = fm.stringWidth(displayText);
+      int textY = (h + fm.getAscent() - fm.getDescent()) / 2;
+      int textX;
+      if (checked) {
+        // 文本在左侧（手柄在右）
+        textX = (handleX - textW) / 2;
+      } else {
+        // 文本在右侧（手柄在左）
+        textX = handleX + handleSize + (w - handleX - handleSize - textW) / 2;
+      }
+      g2.drawString(displayText, textX, textY);
+    }
 
     // 加载指示
     if (loading) {

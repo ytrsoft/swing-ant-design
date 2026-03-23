@@ -43,6 +43,9 @@ public class AntTable extends AbstractAntComponent {
     private final String key;
     private final String title;
     private final int width;
+    private java.util.function.BiFunction<Object, Object[], Component> render;
+    private java.util.Comparator<Object> sorter;
+    private java.util.function.Function<Object, String[]> filters;
 
     public Column(String key, String title) {
       this(key, title, -1);
@@ -53,16 +56,51 @@ public class AntTable extends AbstractAntComponent {
       this.title = title;
       this.width = width;
     }
+
+    /**
+     * 设置自定义渲染函数。
+     *
+     * @param render 渲染函数 (cellValue, rowData) → Component
+     * @return this（链式调用）
+     */
+    public Column setRender(
+        java.util.function.BiFunction<Object, Object[], Component> render) {
+      this.render = render;
+      return this;
+    }
+
+    /**
+     * 设置排序比较器。设置后表头可点击排序。
+     *
+     * @param sorter 列值比较器
+     * @return this
+     */
+    public Column setSorter(java.util.Comparator<Object> sorter) {
+      this.sorter = sorter;
+      return this;
+    }
   }
 
   @Getter private Column[] columns;
   @Getter private boolean bordered;
   @Getter private boolean showHeader;
+  @Getter private boolean loading;
   private ComponentSize size;
 
+  // 分页
+  @Getter private int pageSize;
+  @Getter private int currentPage;
+
+  // 排序
+  private int sortColumnIndex = -1;
+  private boolean sortAscending = true;
+
   private final List<Object[]> dataRows = new ArrayList<>();
+  private List<Object[]> displayRows; // 排序后视图
   private JTable jTable;
   private AntTableModel tableModel;
+  private JPanel paginationPanel;
+  private JLabel pageInfoLabel;
   private final List<AntChangeListener<int[]>> selectionListeners = new ArrayList<>();
 
   /**
@@ -75,6 +113,9 @@ public class AntTable extends AbstractAntComponent {
     this.bordered = true;
     this.showHeader = true;
     this.size = ComponentSize.MIDDLE;
+    this.pageSize = -1; // -1 表示不分页
+    this.currentPage = 1;
+    this.displayRows = dataRows;
 
     setLayout(new BorderLayout());
     buildTable();
@@ -92,7 +133,7 @@ public class AntTable extends AbstractAntComponent {
    */
   public void addRow(Object[] row) {
     dataRows.add(row);
-    tableModel.fireTableRowsInserted(dataRows.size() - 1, dataRows.size() - 1);
+    refreshDisplay();
   }
 
   /**
@@ -105,7 +146,8 @@ public class AntTable extends AbstractAntComponent {
     if (rows != null) {
       dataRows.addAll(rows);
     }
-    tableModel.fireTableDataChanged();
+    currentPage = 1;
+    refreshDisplay();
   }
 
   /**
@@ -116,14 +158,15 @@ public class AntTable extends AbstractAntComponent {
   public void removeRow(int rowIndex) {
     if (rowIndex >= 0 && rowIndex < dataRows.size()) {
       dataRows.remove(rowIndex);
-      tableModel.fireTableRowsDeleted(rowIndex, rowIndex);
+      refreshDisplay();
     }
   }
 
   /** 清空所有数据。 */
   public void clearData() {
     dataRows.clear();
-    tableModel.fireTableDataChanged();
+    currentPage = 1;
+    refreshDisplay();
   }
 
   /** 获取选中行索引。 */
@@ -160,6 +203,43 @@ public class AntTable extends AbstractAntComponent {
 
   public ComponentSize getComponentSize() {
     return size;
+  }
+
+  /**
+   * 设置每页行数。{@code -1} 表示不分页。
+   *
+   * @param pageSize 每页行数
+   */
+  public void setPageSize(int pageSize) {
+    this.pageSize = pageSize;
+    this.currentPage = 1;
+    refreshDisplay();
+    buildPagination();
+  }
+
+  /**
+   * 跳转到指定页。
+   *
+   * @param page 页码（从 1 开始）
+   */
+  public void setCurrentPage(int page) {
+    this.currentPage = Math.max(1, Math.min(page, getTotalPages()));
+    refreshDisplay();
+    updatePaginationLabel();
+  }
+
+  /** 设置加载状态。 */
+  public void setLoading(boolean loading) {
+    this.loading = loading;
+    repaint();
+  }
+
+  /** 获取总页数。 */
+  public int getTotalPages() {
+    if (pageSize <= 0) {
+      return 1;
+    }
+    return Math.max(1, (int) Math.ceil((double) displayRows.size() / pageSize));
   }
 
   /** 添加行选中变更监听器。 */
@@ -202,13 +282,132 @@ public class AntTable extends AbstractAntComponent {
       }
     }
 
+    // 表头点击排序
+    jTable.getTableHeader().addMouseListener(new java.awt.event.MouseAdapter() {
+      @Override
+      public void mouseClicked(java.awt.event.MouseEvent e) {
+        int col = jTable.columnAtPoint(e.getPoint());
+        if (col >= 0 && col < columns.length && columns[col].getSorter() != null) {
+          if (sortColumnIndex == col) {
+            sortAscending = !sortAscending;
+          } else {
+            sortColumnIndex = col;
+            sortAscending = true;
+          }
+          refreshDisplay();
+        }
+      }
+    });
+
     JScrollPane scrollPane = new JScrollPane(jTable);
     scrollPane.setBorder(BorderFactory.createEmptyBorder());
     add(scrollPane, BorderLayout.CENTER);
 
+    // 分页栏
+    buildPagination();
+
     applyTheme();
     revalidate();
     repaint();
+  }
+
+  /** 刷新显示数据（排序 + 分页）。 */
+  private void refreshDisplay() {
+    // 排序
+    if (sortColumnIndex >= 0 && sortColumnIndex < columns.length
+        && columns[sortColumnIndex].getSorter() != null) {
+      displayRows = new ArrayList<>(dataRows);
+      java.util.Comparator<Object> cmp = columns[sortColumnIndex].getSorter();
+      int colIdx = sortColumnIndex;
+      displayRows.sort((a, b) -> {
+        Object va = (colIdx < a.length) ? a[colIdx] : null;
+        Object vb = (colIdx < b.length) ? b[colIdx] : null;
+        int result = cmp.compare(va, vb);
+        return sortAscending ? result : -result;
+      });
+    } else {
+      displayRows = dataRows;
+    }
+
+    if (tableModel != null) {
+      tableModel.fireTableDataChanged();
+    }
+    updatePaginationLabel();
+  }
+
+  /** 获取当前页的数据视图。 */
+  private List<Object[]> getPageView() {
+    if (pageSize <= 0) {
+      return displayRows;
+    }
+    int from = (currentPage - 1) * pageSize;
+    int to = Math.min(from + pageSize, displayRows.size());
+    if (from >= displayRows.size()) {
+      return java.util.Collections.emptyList();
+    }
+    return displayRows.subList(from, to);
+  }
+
+  /** 构建分页栏。 */
+  private void buildPagination() {
+    if (paginationPanel != null) {
+      remove(paginationPanel);
+    }
+    if (pageSize <= 0) {
+      paginationPanel = null;
+      return;
+    }
+
+    ColorToken ct = colorToken();
+    FontToken ft = fontToken();
+    SizeToken st = sizeToken();
+
+    paginationPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
+    paginationPanel.setOpaque(false);
+    paginationPanel.setBorder(BorderFactory.createMatteBorder(
+        1, 0, 0, 0, ct.getBorderSecondaryColor()));
+
+    JLabel prevBtn = new JLabel("◀");
+    prevBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    prevBtn.setForeground(ct.getTextSecondaryColor());
+    prevBtn.addMouseListener(new java.awt.event.MouseAdapter() {
+      @Override
+      public void mouseClicked(java.awt.event.MouseEvent e) {
+        if (currentPage > 1) {
+          setCurrentPage(currentPage - 1);
+        }
+      }
+    });
+    paginationPanel.add(prevBtn);
+
+    pageInfoLabel = new JLabel();
+    pageInfoLabel.setFont(ft.createFont(ft.getFontSizeSm(), Font.PLAIN));
+    pageInfoLabel.setForeground(ct.getTextColor());
+    paginationPanel.add(pageInfoLabel);
+
+    JLabel nextBtn = new JLabel("▶");
+    nextBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    nextBtn.setForeground(ct.getTextSecondaryColor());
+    nextBtn.addMouseListener(new java.awt.event.MouseAdapter() {
+      @Override
+      public void mouseClicked(java.awt.event.MouseEvent e) {
+        if (currentPage < getTotalPages()) {
+          setCurrentPage(currentPage + 1);
+        }
+      }
+    });
+    paginationPanel.add(nextBtn);
+
+    add(paginationPanel, BorderLayout.SOUTH);
+    updatePaginationLabel();
+  }
+
+  /** 更新分页标签文本。 */
+  private void updatePaginationLabel() {
+    if (pageInfoLabel != null) {
+      pageInfoLabel.setText(currentPage + " / " + getTotalPages()
+          + "  (共 " + displayRows.size() + " 条)");
+    }
   }
 
   private void applyTheme() {
@@ -242,27 +441,74 @@ public class AntTable extends AbstractAntComponent {
     jTable.setGridColor(ct.getBorderSecondaryColor());
     jTable.setShowHorizontalLines(true);
 
-    // 表头
+    // 表头（带排序指示器）
     JTableHeader header = jTable.getTableHeader();
     header.setFont(ft.createFont(fontSize, Font.BOLD));
     header.setBackground(themeManager().isDark()
         ? ColorToken.parseHexColor("#1D1D1D") : ColorToken.parseHexColor("#FAFAFA"));
     header.setForeground(ct.getTextColor());
-
-    // 单元格渲染
-    DefaultTableCellRenderer cellRenderer = new DefaultTableCellRenderer() {
+    header.setDefaultRenderer(new DefaultTableCellRenderer() {
       @Override
       public Component getTableCellRendererComponent(JTable table, Object value,
-          boolean isSelected, boolean hasFocus, int row, int column) {
+          boolean isSelected, boolean hasFocus, int row, int col) {
         JLabel label = (JLabel) super.getTableCellRendererComponent(
-            table, value, isSelected, hasFocus, row, column);
-        int pad = (size == ComponentSize.SMALL) ? st.getPaddingXs() : st.getPaddingSm();
-        label.setBorder(BorderFactory.createEmptyBorder(0, pad, 0, pad));
+            table, value, isSelected, hasFocus, row, col);
+        label.setFont(ft.createFont(fontSize, Font.BOLD));
+        label.setBackground(themeManager().isDark()
+            ? ColorToken.parseHexColor("#1D1D1D") : ColorToken.parseHexColor("#FAFAFA"));
+        label.setForeground(ct.getTextColor());
+        label.setHorizontalAlignment(JLabel.LEFT);
+        int pad = st.getPaddingSm();
+        label.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, ct.getBorderSecondaryColor()),
+            BorderFactory.createEmptyBorder(0, pad, 0, pad)));
+        // 排序指示器
+        if (col < columns.length && columns[col].getSorter() != null
+            && sortColumnIndex == col) {
+          String arrow = sortAscending ? " ↑" : " ↓";
+          label.setText(label.getText() + arrow);
+        }
         return label;
       }
-    };
+    });
+
+    // 单元格渲染（支持 Column.render 自定义）
     for (int i = 0; i < jTable.getColumnCount(); i++) {
-      jTable.getColumnModel().getColumn(i).setCellRenderer(cellRenderer);
+      final int colIdx = i;
+      jTable.getColumnModel().getColumn(i).setCellRenderer(
+          new javax.swing.table.TableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+              // 尝试使用自定义 render
+              if (colIdx < columns.length && columns[colIdx].getRender() != null) {
+                List<Object[]> pageData = getPageView();
+                Object[] rowData = (row < pageData.size()) ? pageData.get(row) : null;
+                Component custom = columns[colIdx].getRender().apply(value, rowData);
+                if (custom != null) {
+                  if (isSelected) {
+                    custom.setBackground(ct.getPrimaryBgColor());
+                  }
+                  return custom;
+                }
+              }
+              // 默认渲染
+              DefaultTableCellRenderer def = new DefaultTableCellRenderer();
+              JLabel label = (JLabel) def.getTableCellRendererComponent(
+                  table, value, isSelected, hasFocus, row, column);
+              int pad = (size == ComponentSize.SMALL) ? st.getPaddingXs() : st.getPaddingSm();
+              label.setBorder(BorderFactory.createEmptyBorder(0, pad, 0, pad));
+              label.setFont(ft.createFont(fontSize, Font.PLAIN));
+              if (isSelected) {
+                label.setBackground(ct.getPrimaryBgColor());
+                label.setForeground(ct.getTextColor());
+              } else {
+                label.setBackground(ct.getBgContainer());
+                label.setForeground(ct.getTextColor());
+              }
+              return label;
+            }
+          });
     }
 
     if (bordered) {
@@ -282,7 +528,7 @@ public class AntTable extends AbstractAntComponent {
 
     @Override
     public int getRowCount() {
-      return dataRows.size();
+      return getPageView().size();
     }
 
     @Override
@@ -297,8 +543,9 @@ public class AntTable extends AbstractAntComponent {
 
     @Override
     public Object getValueAt(int rowIndex, int columnIndex) {
-      if (rowIndex < dataRows.size()) {
-        Object[] row = dataRows.get(rowIndex);
+      List<Object[]> page = getPageView();
+      if (rowIndex < page.size()) {
+        Object[] row = page.get(rowIndex);
         if (columnIndex < row.length) {
           return row[columnIndex];
         }

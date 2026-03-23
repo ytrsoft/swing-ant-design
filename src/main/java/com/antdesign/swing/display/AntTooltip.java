@@ -5,6 +5,7 @@ import com.antdesign.swing.model.Placement;
 import com.antdesign.swing.theme.token.ColorToken;
 import com.antdesign.swing.theme.token.FontToken;
 import com.antdesign.swing.theme.token.SizeToken;
+import com.antdesign.swing.util.PopupHelper;
 import lombok.Getter;
 
 import javax.swing.*;
@@ -141,46 +142,13 @@ public class AntTooltip extends AbstractAntComponent {
     if (popup != null || tipText.isEmpty()) {
       return;
     }
-    Dimension pref = getPreferredSize();
-    setSize(pref);
-
-    Point ownerScreen = owner.getLocationOnScreen();
-    int ox = ownerScreen.x;
-    int oy = ownerScreen.y;
-    int ow = owner.getWidth();
-    int oh = owner.getHeight();
-
-    int px;
-    int py;
-    switch (placement) {
-      case BOTTOM:
-        px = ox + (ow - pref.width) / 2;
-        py = oy + oh + OFFSET;
-        break;
-      case LEFT:
-        px = ox - pref.width - OFFSET;
-        py = oy + (oh - pref.height) / 2;
-        break;
-      case RIGHT:
-        px = ox + ow + OFFSET;
-        py = oy + (oh - pref.height) / 2;
-        break;
-      default:
-        px = ox + (ow - pref.width) / 2;
-        py = oy - pref.height - OFFSET;
-        break;
-    }
-
-    popup = PopupFactory.getSharedInstance().getPopup(owner, this, px, py);
-    popup.show();
+    popup = PopupHelper.showPopup(owner, this, placement, OFFSET);
   }
 
   /** 隐藏提示。 */
   public void hideTooltip() {
-    if (popup != null) {
-      popup.hide();
-      popup = null;
-    }
+    PopupHelper.hidePopup(popup);
+    popup = null;
   }
 
   // =========================================================================

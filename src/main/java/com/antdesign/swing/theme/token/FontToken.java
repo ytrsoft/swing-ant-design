@@ -1,5 +1,6 @@
 package com.antdesign.swing.theme.token;
 
+import com.antdesign.swing.model.ComponentSize;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -135,5 +136,33 @@ public class FontToken {
    */
   public int computeLineHeightPx(int fontSizePx) {
     return (int) Math.ceil(fontSizePx * lineHeight);
+  }
+
+  /**
+   * 根据组件尺寸返回对应字号。消除各组件中重复的 size-switch 代码。
+   *
+   * @param size 组件尺寸
+   * @return 对应字号（px）
+   */
+  public int fontSizeOf(ComponentSize size) {
+    if (size == null) {
+      return fontSize;
+    }
+    switch (size) {
+      case LARGE:  return fontSizeLg;
+      case SMALL:  return fontSizeSm;
+      default:     return fontSize;
+    }
+  }
+
+  /**
+   * 根据组件尺寸创建字体。
+   *
+   * @param size  组件尺寸
+   * @param style 字体样式（如 {@link Font#PLAIN}）
+   * @return 字体实例
+   */
+  public Font createFont(ComponentSize size, int style) {
+    return createFont(fontSizeOf(size), style);
   }
 }

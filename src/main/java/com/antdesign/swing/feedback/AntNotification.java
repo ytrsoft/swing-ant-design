@@ -6,6 +6,7 @@ import com.antdesign.swing.theme.token.ColorToken;
 import com.antdesign.swing.theme.token.FontToken;
 import com.antdesign.swing.theme.token.SizeToken;
 import com.antdesign.swing.util.AntIcons;
+import com.antdesign.swing.util.GraphicsUtils;
 
 import javax.swing.*;
 import java.awt.*;
@@ -193,11 +194,8 @@ public final class AntNotification {
 
     @Override
     protected void paintAnt(Graphics2D g2, int width, int height) {
-      // 阴影
-      for (int i = 6; i > 0; i--) {
-        g2.setColor(new Color(0, 0, 0, 5 * (7 - i)));
-        g2.fillRoundRect(i, i + 2, width - i * 2, height - i * 2, 8, 8);
-      }
+      GraphicsUtils.drawShadow(g2, 0, 0, width, height,
+          8, new Color(0, 0, 0, 35), 2, 6);
 
       ColorToken ct = colorToken();
       g2.setColor(ct.getBgElevated());

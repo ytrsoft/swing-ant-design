@@ -5,6 +5,7 @@ import com.antdesign.swing.model.Status;
 import com.antdesign.swing.theme.token.ColorToken;
 import com.antdesign.swing.theme.token.FontToken;
 import com.antdesign.swing.util.AntIcons;
+import com.antdesign.swing.util.GraphicsUtils;
 
 import javax.swing.*;
 import java.awt.*;
@@ -84,9 +85,36 @@ public final class AntMessage {
     show(content, Status.INFO, durationMs);
   }
 
-  /** 加载消息。 */
-  public static void loading(String content) {
-    show(content, Status.INFO, DEFAULT_DURATION);
+  /** 加载消息，不自动关闭，返回关闭句柄。 */
+  public static Runnable loading(String content) {
+    final JWindow[] ref = new JWindow[1];
+    SwingUtilities.invokeLater(() -> {
+      Window owner = findActiveWindow();
+      if (owner == null) {
+        return;
+      }
+
+      JWindow popup = new JWindow(owner);
+      popup.setAlwaysOnTop(true);
+      ref[0] = popup;
+
+      LoadingPanel panel = new LoadingPanel(content);
+      popup.setContentPane(panel);
+      popup.pack();
+
+      repositionAll(popup, owner);
+      popup.setVisible(true);
+      ACTIVE_MESSAGES.add(popup);
+    });
+
+    // 返回关闭句柄
+    return () -> {
+      SwingUtilities.invokeLater(() -> {
+        if (ref[0] != null) {
+          close(ref[0]);
+        }
+      });
+    };
   }
 
   // =========================================================================
@@ -223,13 +251,83 @@ public final class AntMessage {
 
     @Override
     protected void paintAnt(Graphics2D g2, int width, int height) {
-      // 阴影
-      for (int i = 4; i > 0; i--) {
-        g2.setColor(new Color(0, 0, 0, 8 * (5 - i)));
-        g2.fillRoundRect(i, i + 1, width - i * 2, height - i * 2, 8, 8);
-      }
+      GraphicsUtils.drawShadow(g2, 0, 0, width, height,
+          8, new Color(0, 0, 0, 32), 1, 4);
 
-      // 白色背景
+      ColorToken ct = colorToken();
+      g2.setColor(ct.getBgElevated());
+      g2.fillRoundRect(0, 0, width - 1, height - 1, 8, 8);
+    }
+
+    @Override
+    public Dimension getPreferredSize() {
+      Dimension d = super.getPreferredSize();
+      return new Dimension(d.width + 8, d.height + 8);
+    }
+  }
+
+  /**
+   * 加载消息面板，带旋转指示器。
+   */
+  private static class LoadingPanel extends AbstractAntPanel {
+
+    private int angle;
+    private final Timer animTimer;
+
+    LoadingPanel(String content) {
+      setOpaque(false);
+      setLayout(new BorderLayout(8, 0));
+      setBorder(BorderFactory.createEmptyBorder(10, 16, 10, 16));
+
+      ColorToken ct = colorToken();
+      FontToken ft = fontToken();
+
+      // 旋转图标占位
+      JComponent spinner = new JComponent() {
+        @Override
+        protected void paintComponent(Graphics g) {
+          Graphics2D g2 = (Graphics2D) g.create();
+          g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+              RenderingHints.VALUE_ANTIALIAS_ON);
+          int s = Math.min(getWidth(), getHeight());
+          g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+          g2.setColor(ct.getPrimaryColor());
+          g2.drawArc(1, 1, s - 3, s - 3, angle, 270);
+          g2.dispose();
+        }
+
+        @Override
+        public Dimension getPreferredSize() {
+          return new Dimension(16, 16);
+        }
+      };
+      add(spinner, BorderLayout.WEST);
+
+      // 文本
+      JLabel textLabel = new JLabel(content);
+      textLabel.setFont(ft.createFont(ft.getFontSize(), Font.PLAIN));
+      textLabel.setForeground(ct.getTextColor());
+      add(textLabel, BorderLayout.CENTER);
+
+      // 动画定时器
+      animTimer = new Timer(50, e -> {
+        angle = (angle + 15) % 360;
+        spinner.repaint();
+      });
+      animTimer.start();
+    }
+
+    /** 停止动画（面板移除时调用）。 */
+    @Override
+    public void removeNotify() {
+      super.removeNotify();
+      animTimer.stop();
+    }
+
+    @Override
+    protected void paintAnt(Graphics2D g2, int width, int height) {
+      GraphicsUtils.drawShadow(g2, 0, 0, width, height,
+          8, new Color(0, 0, 0, 32), 1, 4);
       ColorToken ct = colorToken();
       g2.setColor(ct.getBgElevated());
       g2.fillRoundRect(0, 0, width - 1, height - 1, 8, 8);
